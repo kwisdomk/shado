@@ -1,6 +1,7 @@
+import Link from "next/link";
+
 import ShadoLogo from "./components/ShadoLogo";
 import Card from "./components/Card";
-import Button from "./components/Button";
 
 export default function Home() {
   return (
@@ -131,13 +132,18 @@ export default function Home() {
             justifyContent: "center",
           }}
         >
-          <Button variant="primary">Analyze a Message</Button>
-          <Button variant="ghost">How It Works</Button>
+          <Link href="/analyze" className="shado-btn shado-btn-primary">
+            Analyze a Message
+          </Link>
+          <a href="#how-it-works" className="shado-btn shado-btn-ghost">
+            How It Works
+          </a>
         </div>
       </section>
 
       {/* ── Feature Cards ── */}
       <section
+        id="how-it-works"
         style={{
           maxWidth: 1080,
           margin: "0 auto",
@@ -167,8 +173,8 @@ export default function Home() {
               lineHeight: 1.6,
             }}
           >
-            Works offline. Your message never leaves your device unless you
-            explicitly opt in to AI-assisted review.
+            Runs locally in your browser. During this local analysis, your
+            message stays on the page and no network request is made.
           </p>
         </Card>
 
