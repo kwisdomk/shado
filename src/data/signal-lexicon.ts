@@ -60,7 +60,10 @@ export const SIGNAL_LEXICON = Object.freeze([
   }),
   entry({
     code: 'ACCIDENTAL_TRANSFER',
-    patterns: [],
+    patterns: [
+      /\baccidentally sent\b/iu,
+      /\bsent\b.{0,40}\bby mistake\b/iu,
+    ],
     keywords: ['sent by mistake', 'sent money by mistake', 'wrong number'],
     language: 'english',
     severity: 'medium',
@@ -76,6 +79,14 @@ export const SIGNAL_LEXICON = Object.freeze([
     code: 'URGENCY_THREAT',
     patterns: [
       /\b(?:account|pin|line|service)\b.{0,20}\b(?:blocked|suspended|closed|disabled)\b/iu,
+    ],
+    keywords: [],
+    language: 'english',
+    severity: 'high',
+  }),
+  entry({
+    code: 'URGENCY_THREAT',
+    patterns: [
       /\b(?:act|pay|reply|respond|verify|confirm|call|send)\b.{0,25}\b(?:immediately|today|right now|before (?:the )?deadline)\b/iu,
     ],
     keywords: [],
@@ -110,11 +121,19 @@ export const SIGNAL_LEXICON = Object.freeze([
     patterns: [
       /\bhttps?:\/\/(?:bit\.ly|tinyurl\.com|t\.co|is\.gd|cutt\.ly)(?::\d+)?(?:[/?#][^\s]*)?/iu,
       /\bhttps?:\/\/(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?(?:[/?#][^\s]*)?/iu,
-      /\bhttps?:\/\/(?:[^/\s?#@.]+\.)*[^/\s?#@.]*(?:safaricom|mpesa|kra)[^/\s?#@.]*\.(?!co\.ke(?=[:/?#\s]|$)|go\.ke(?=[:/?#\s]|$))[a-z]{2,}(?:\.[a-z]{2,})?(?::\d+)?(?=[/?#\s]|$)(?:[/?#][^\s]*)?/iu,
     ],
     keywords: [],
     language: 'english',
     severity: 'medium',
+  }),
+  entry({
+    code: 'SUSPICIOUS_LINK',
+    patterns: [
+      /\bhttps?:\/\/(?:[^/\s?#@.]+\.)*[^/\s?#@.]*(?:safaricom|mpesa|kra)[^/\s?#@.]*\.(?!co\.ke(?=[:/?#\s]|$)|go\.ke(?=[:/?#\s]|$))[a-z]{2,}(?:\.[a-z]{2,})?(?::\d+)?(?=[/?#\s]|$)(?:[/?#][^\s]*)?/iu,
+    ],
+    keywords: [],
+    language: 'english',
+    severity: 'high',
   }),
   entry({
     code: 'CONTACT_DIVERSION',

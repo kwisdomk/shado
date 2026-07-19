@@ -40,18 +40,29 @@ describe('extractSignals', () => {
     ).toEqual(
       expect.arrayContaining(['ACCIDENTAL_TRANSFER', 'MANUAL_REPAYMENT']),
     );
+    expect(
+      codesFor('I accidentally sent you Ksh 5000. Please send back Ksh 5000'),
+    ).toEqual(
+      expect.arrayContaining(['ACCIDENTAL_TRANSFER', 'MANUAL_REPAYMENT']),
+    );
   });
 
   it('detects the approved KRA impersonation signal combination', () => {
-    expect(
-      codesFor('KRA: Your PIN has been suspended. Pay penalty via link'),
-    ).toEqual(
+    const signals = extractSignals(
+      'kra: your pin has been suspended. pay penalty via link',
+      'KRA: Your PIN has been suspended. Pay penalty via link',
+    );
+
+    expect(signals.map(({ code }) => code)).toEqual(
       expect.arrayContaining([
         'IMPERSONATION_KRA',
         'URGENCY_THREAT',
         'FEE_BEFORE_REWARD',
       ]),
     );
+    expect(
+      signals.find(({ code }) => code === 'URGENCY_THREAT')?.severity,
+    ).toBe('high');
   });
 
   it('treats a benign M-PESA mention as information only', () => {
@@ -67,9 +78,17 @@ describe('extractSignals', () => {
   });
 
   it('detects approved suspicious-link patterns', () => {
-    expect(codesFor('Click https://bit.ly/xyz123')).toContain(
-      'SUSPICIOUS_LINK',
-    );
+    const shortened = extractSignals(
+      'click https://bit.ly/xyz123',
+      'Click https://bit.ly/xyz123',
+    ).find(({ code }) => code === 'SUSPICIOUS_LINK');
+    const lookalike = extractSignals(
+      'open https://safaricom-login.example',
+      'Open https://safaricom-login.example',
+    ).find(({ code }) => code === 'SUSPICIOUS_LINK');
+
+    expect(shortened).toMatchObject({ severity: 'medium' });
+    expect(lookalike).toMatchObject({ severity: 'high' });
     expect(codesFor('Open http://192.0.2.10/login')).toContain(
       'SUSPICIOUS_LINK',
     );
@@ -129,6 +148,18 @@ describe('extractSignals', () => {
     for (const message of benignMessages) {
       expect(codesFor(message)).toEqual([]);
     }
+  });
+
+  it('keeps deadline pressure below suspension or blocking severity', () => {
+    const [urgency] = extractSignals(
+      'call me immediately',
+      'Call me immediately',
+    );
+
+    expect(urgency).toMatchObject({
+      code: 'URGENCY_THREAT',
+      severity: 'medium',
+    });
   });
 
   it('orders mixed English and Swahili metadata deterministically', () => {
