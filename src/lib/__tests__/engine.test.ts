@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { MAX_INPUT_LENGTH, POLICY_VERSION, SCHEMA_VERSION } from '../constants';
-import { analyzeMessage } from '../engine';
+import { analyzeMessage, resolveSignalLanguages } from '../engine';
 import { AnalysisReportSchema } from '../schema';
 
 describe('analyzeMessage', () => {
@@ -117,6 +117,7 @@ describe('analyzeMessage', () => {
     for (const input of ['', '  \n\t ']) {
       const report = analyzeMessage(input);
       expect(report.riskLevel).toBe('uncertain');
+      expect(report.languages).toEqual(['local']);
       expect(report.uncertainty).not.toBeNull();
       expect(AnalysisReportSchema.safeParse(report).success).toBe(true);
     }
@@ -150,12 +151,43 @@ describe('analyzeMessage', () => {
   });
 
   it('derives report languages only from matched lexicon entries', () => {
-    expect(analyzeMessage('Tafadhali tuma nambari ya siri').languages).toEqual([
-      'swahili',
+    expect(analyzeMessage('Please share your OTP').languages).toEqual([
+      'english',
     ]);
+    expect(
+      analyzeMessage('Tafadhali tuma nambari ya siri').languages,
+    ).toEqual(['swahili']);
     expect(
       analyzeMessage('Send the money back, rudisha pesa').languages,
     ).toEqual(['english', 'swahili']);
+  });
+
+  it('uses local only when no matched language metadata exists', () => {
+    expect(resolveSignalLanguages([])).toEqual(['local']);
+    expect(analyzeMessage('Habari yako?').languages).toEqual(['local']);
+  });
+
+  it('preserves local lexicon metadata and deduplicates typed languages', () => {
+    expect(resolveSignalLanguages([{ languages: ['local'] }])).toEqual([
+      'local',
+    ]);
+    expect(
+      resolveSignalLanguages([
+        { languages: ['local', 'english'] },
+        { languages: ['english', 'swahili', 'local'] },
+      ]),
+    ).toEqual(['english', 'swahili', 'local']);
+  });
+
+  it('keeps fallback language metadata isolated from risk behavior', () => {
+    const report = analyzeMessage('Habari yako?');
+
+    expect(report.languages).toEqual(['local']);
+    expect(report.indicatorScore).toBe(0);
+    expect(report.riskLevel).toBe('low');
+    expect(report.evidence).toEqual([]);
+    expect(report.recommendedActionCodes).toEqual([]);
+    expect(report.likelyFamily).toBe('none');
   });
 
   it('re-masks supplied text and remains deterministic', () => {

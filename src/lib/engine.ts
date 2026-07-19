@@ -162,14 +162,16 @@ function evidenceFrom(signals: readonly ExtractedSignal[]): EvidenceItem[] {
   }));
 }
 
-function languagesFrom(signals: readonly ExtractedSignal[]): Language[] {
+export function resolveSignalLanguages(
+  signals: readonly Pick<ExtractedSignal, 'languages'>[],
+): Language[] {
   const matched = LanguageSchema.options.filter((language) =>
     signals.some((signal) => signal.languages.includes(language)),
   );
 
   // The contract requires at least one label. This deterministic fallback is
   // metadata only and never contributes evidence or risk weight.
-  return matched.length > 0 ? matched : ['english'];
+  return matched.length > 0 ? matched : ['local'];
 }
 
 function uncertainReport(message: string): AnalysisReport {
@@ -181,7 +183,7 @@ function uncertainReport(message: string): AnalysisReport {
     indicatorScore: 0,
     scoreIsProbability: false,
     likelyFamily: 'unknown',
-    languages: ['english'],
+    languages: ['local'],
     headline: generateHeadline('uncertain'),
     summary: 'The local rules could not produce a reliable assessment for this input.',
     evidence: [],
@@ -231,7 +233,7 @@ export function analyzeMessage(rawText: string): AnalysisReport {
     indicatorScore: score,
     scoreIsProbability: false as const,
     likelyFamily,
-    languages: languagesFrom(signals),
+    languages: resolveSignalLanguages(signals),
     headline: generateHeadline(riskLevel),
     summary: generateSummary(signals, likelyFamily),
     evidence: evidenceFrom(signals),
