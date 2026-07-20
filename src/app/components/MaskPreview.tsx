@@ -53,7 +53,7 @@ export default function MaskPreview({
   onChange,
 }: MaskPreviewProps) {
   return (
-    <section className="shado-card" aria-labelledby="mask-preview-heading">
+    <section className="analysis-section" aria-labelledby="mask-preview-heading">
       <h1 id="mask-preview-heading" style={{ marginTop: 0 }}>
         Review &amp; Mask
       </h1>
@@ -62,20 +62,18 @@ export default function MaskPreview({
         not want analyzed.
       </p>
       <div
+        className="mask-preview-surface"
         aria-label="Masked placeholder preview"
         style={{
           whiteSpace: 'pre-wrap',
           overflowWrap: 'anywhere',
-          background: 'var(--night)',
-          borderRadius: 'var(--radius-md)',
-          padding: 'var(--space-md)',
           marginBottom: 'var(--space-md)',
         }}
       >
         {highlightedText(editedMaskedText)}
       </div>
       {maskResult.hasUnmaskedNames ? (
-        <p role="note" style={{ color: 'var(--error)' }}>
+        <p role="note" className="masking-review-note">
           Names may not be automatically detected. Please review and redact any
           personal names manually.
         </p>

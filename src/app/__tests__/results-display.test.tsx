@@ -2,19 +2,21 @@
 
 import '@testing-library/jest-dom/vitest';
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { AnalysisReport, RiskLevel } from '../../lib/schema';
 import ActionsList from '../components/ActionsList';
 import EvidenceList from '../components/EvidenceList';
 import LimitationsFooter from '../components/LimitationsFooter';
-import MethodBadge from '../components/MethodBadge';
 import RiskCard from '../components/RiskCard';
 import AnalyzePage from '../analyze/page';
 import Home from '../page';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 function report(overrides: Partial<AnalysisReport> = {}): AnalysisReport {
   return {
@@ -45,6 +47,34 @@ function report(overrides: Partial<AnalysisReport> = {}): AnalysisReport {
   };
 }
 
+async function completeAnalysis(message: string) {
+  const frames: FrameRequestCallback[] = [];
+  vi.stubGlobal(
+    'requestAnimationFrame',
+    vi.fn((callback: FrameRequestCallback) => {
+      frames.push(callback);
+      return frames.length;
+    }),
+  );
+
+  fireEvent.change(
+    screen.getByRole('textbox', { name: /suspicious message/i }),
+    { target: { value: message } },
+  );
+  fireEvent.click(screen.getByRole('button', { name: /review message/i }));
+  fireEvent.click(screen.getByRole('button', { name: /analyze safely/i }));
+
+  for (let index = 0; index < 3; index += 1) {
+    const frame = frames.shift();
+    expect(frame).toBeDefined();
+    await act(async () => {
+      frame?.(performance.now());
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  }
+}
+
 describe('results components', () => {
   it.each([
     ['low', 'Low'],
@@ -60,11 +90,21 @@ describe('results components', () => {
     expect(screen.getByLabelText(/risk symbol/i)).toBeInTheDocument();
   });
 
-  it('shows score as an indicator rather than a probability', () => {
+  it('shows the indicator score without technical disclaimer repetition', () => {
     render(<RiskCard report={report()} />);
 
     expect(screen.getByText('55/100')).toBeInTheDocument();
-    expect(screen.getByText(/not a probability of fraud/i)).toBeInTheDocument();
+    expect(screen.queryByText(/not a probability of fraud/i)).not.toBeInTheDocument();
+  });
+
+  it('does not render an empty or unknown likely-family label in the primary result', () => {
+    const { rerender } = render(
+      <RiskCard report={report({ likelyFamily: 'none' })} />,
+    );
+    expect(screen.queryByText('No likely family')).not.toBeInTheDocument();
+
+    rerender(<RiskCard report={report({ likelyFamily: 'unknown' })} />);
+    expect(screen.queryByText('Unknown family')).not.toBeInTheDocument();
   });
 
   it('renders the reason for an uncertain result', () => {
@@ -80,15 +120,24 @@ describe('results components', () => {
     expect(screen.getByText('No message text was provided.')).toBeInTheDocument();
   });
 
-  it('renders evidence URLs as inert text only', () => {
+  it('hides an empty evidence section and uses concise plain text', () => {
+    const { container } = render(<EvidenceList evidence={[]} />);
+
+    expect(screen.queryByRole('heading', { name: 'Evidence' })).not.toBeInTheDocument();
+    expect(screen.getByText('No specific warning signs were detected.')).toBeInTheDocument();
+    expect(container.querySelector('.shado-card')).toBeNull();
+  });
+
+  it('renders evidence URLs as inert unboxed text', () => {
     const { container } = render(<EvidenceList evidence={report().evidence} />);
 
     expect(screen.getByText(/https:\/\/malicious\.example/u)).toBeInTheDocument();
     expect(container.querySelector('a')).toBeNull();
+    expect(container.querySelector('.shado-card')).toBeNull();
     expect(screen.getByText('Local rule')).toBeInTheDocument();
   });
 
-  it('resolves actions and official source metadata without clickable links', () => {
+  it('resolves actions and official source metadata without cards or clickable links', () => {
     const { container } = render(
       <ActionsList
         actionCodes={[
@@ -104,58 +153,60 @@ describe('results components', () => {
     expect(screen.getByText(/Fraud Awareness/u)).toBeInTheDocument();
     expect(screen.getAllByText(/reviewed 2026-07-19/i)).toHaveLength(2);
     expect(container.querySelector('a')).toBeNull();
+    expect(container.querySelector('.shado-card')).toBeNull();
   });
 
-  it('identifies local analysis and always renders limitations and versions', () => {
-    render(
-      <>
-        <MethodBadge method="local" />
-        <LimitationsFooter report={report()} />
-      </>,
-    );
+  it('places method, limitations, action caveat, and versions in native disclosure', () => {
+    render(<LimitationsFooter report={report()} />);
 
+    const disclosure = screen.getByText('More about this analysis').closest('details');
+    expect(disclosure).toBeInTheDocument();
     expect(screen.getByText('Local safety analysis')).toBeInTheDocument();
     expect(screen.getByText(/analyzed on your device/i)).toBeInTheDocument();
-    expect(screen.getByText(/risk assessment, not a guarantee/i)).toBeInTheDocument();
+    expect(screen.getByText(/not a probability of fraud/i)).toBeInTheDocument();
+    expect(screen.getByText(/actions are display-only/i)).toBeInTheDocument();
     expect(screen.getByText(/policy 0\.1-demo/i)).toBeInTheDocument();
     expect(screen.getByText(/schema 1\.0\.0/i)).toBeInTheDocument();
   });
 
-  it('renders the complete information hierarchy and resets with Analyze Another', async () => {
+  it('renders the simplified hierarchy and resets with Analyze Another', async () => {
     render(<AnalyzePage />);
-
-    fireEvent.change(
-      screen.getByRole('textbox', { name: /suspicious message/i }),
-      { target: { value: 'Please share your OTP' } },
-    );
-    fireEvent.click(screen.getByRole('button', { name: /review message/i }));
-    fireEvent.click(screen.getByRole('button', { name: /analyze safely/i }));
-
-    await screen.findByRole('button', { name: /analyze another/i });
+    await completeAnalysis('Please share your OTP');
 
     const risk = screen.getByRole('heading', {
       name: 'Strong fraud indicators were found',
     });
     const evidence = screen.getByRole('heading', { name: 'Evidence' });
     const actions = screen.getByRole('heading', { name: 'Recommended actions' });
-    const method = screen.getByRole('heading', { name: 'Method' });
-    const limitations = screen.getByRole('heading', { name: 'Limitations' });
+    const details = screen.getByText('More about this analysis');
     for (const [before, after] of [
       [risk, evidence],
       [evidence, actions],
-      [actions, method],
-      [method, limitations],
+      [actions, details],
     ]) {
       expect(
         before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     }
+    expect(screen.getAllByText('This assessment does not guarantee that the message is safe.')).toHaveLength(1);
     expect(screen.getByRole('button', { name: /analyze another/i })).toBeEnabled();
 
     fireEvent.click(screen.getByRole('button', { name: /analyze another/i }));
     expect(
       screen.getByRole('textbox', { name: /suspicious message/i }),
     ).toHaveValue('');
+  });
+
+  it('simplifies low-risk results without an empty family or evidence card', async () => {
+    render(<AnalyzePage />);
+    await completeAnalysis('Hello, I hope you are well today.');
+
+    expect(screen.getByText('Results')).toBeInTheDocument();
+    expect(screen.getByText('Low')).toBeInTheDocument();
+    expect(screen.queryByText('No likely family')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Evidence' })).not.toBeInTheDocument();
+    expect(screen.getByText('No specific warning signs were detected.')).toBeInTheDocument();
+    expect(screen.getByText('More about this analysis')).toBeInTheDocument();
   });
 
   it('links the landing page to implemented sections without PWA or AI claims', () => {

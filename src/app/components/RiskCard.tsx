@@ -11,45 +11,42 @@ const RISK_COPY = {
   { label: string; icon: string; instruction: string }
 >;
 
-const FAMILY_LABELS = {
-  mpesa_reversal: 'M-PESA reversal',
-  kra_impersonation: 'KRA impersonation',
-  credential_theft: 'Credential theft',
-  none: 'No likely family',
-  unknown: 'Unknown family',
-} as const;
+function conciseSummary(summary: string): string {
+  return summary
+    .replace(/\s+This does not guarantee that the message is safe\.$/u, '')
+    .replace(/\s+Verify unexpected requests independently\.$/u, '');
+}
 
 export default function RiskCard({ report }: { report: AnalysisReport }) {
   const copy = RISK_COPY[report.riskLevel];
 
   return (
     <section
-      className="shado-card"
+      className="shado-card result-primary"
       aria-label={`${copy.label} risk result`}
       style={{ borderColor: report.riskLevel === 'low' ? 'var(--violet)' : 'var(--error)' }}
     >
-      <div style={{ display: 'flex', gap: 'var(--space-md)', alignItems: 'center' }}>
-        <span role="img" aria-label="Risk symbol" style={{ fontSize: '2rem' }}>
+      <div className="result-heading-row">
+        <span role="img" aria-label="Risk symbol" className="result-symbol">
           {copy.icon}
         </span>
-        <div>
+        <div className="result-heading-copy">
           <span className="shado-badge">{copy.label}</span>
-          <h1 style={{ marginBottom: 'var(--space-sm)' }}>{report.headline}</h1>
+          <strong className="result-score">{report.indicatorScore}/100</strong>
+          <h1>{report.headline}</h1>
         </div>
       </div>
-      <p style={{ fontWeight: 600 }}>{copy.instruction}</p>
-      <p>{report.summary}</p>
+      <p className="result-explanation">{conciseSummary(report.summary)}</p>
+      <p className="result-primary-action">
+        <strong>What to do:</strong> {copy.instruction}
+      </p>
       {report.uncertainty ? (
-        <p role="note" style={{ color: 'var(--error)' }}>
+        <p role="note" className="result-uncertainty">
           {report.uncertainty}
         </p>
       ) : null}
-      <div style={{ display: 'flex', gap: 'var(--space-md)', flexWrap: 'wrap' }}>
-        <strong>{report.indicatorScore}/100</strong>
-        <span>{FAMILY_LABELS[report.likelyFamily]}</span>
-      </div>
-      <p style={{ color: 'var(--smoke)', marginBottom: 0 }}>
-        This indicator score is not a probability of fraud.
+      <p className="result-main-disclaimer">
+        This assessment does not guarantee that the message is safe.
       </p>
     </section>
   );

@@ -1,18 +1,43 @@
+import { useEffect, useRef } from 'react';
+
 import { MAX_INPUT_LENGTH } from '../../lib/constants';
 
 type TextInputProps = {
   value: string;
+  error: string | null;
+  validationAttempt: number;
   onChange: (value: string) => void;
   onReview: () => void;
 };
 
-export default function TextInput({ value, onChange, onReview }: TextInputProps) {
+export default function TextInput({
+  value,
+  error,
+  validationAttempt,
+  onChange,
+  onReview,
+}: TextInputProps) {
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const describedBy = [
+    'message-input-help',
+    'message-input-count',
+    error ? 'message-input-error' : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  useEffect(() => {
+    if (error) {
+      inputRef.current?.focus();
+    }
+  }, [error, validationAttempt]);
+
   return (
-    <section className="shado-card" aria-labelledby="message-input-heading">
+    <section className="analysis-input-panel" aria-labelledby="message-input-heading">
       <h1 id="message-input-heading" style={{ marginTop: 0 }}>
         Check a suspicious message
       </h1>
-      <p style={{ color: 'var(--smoke)' }}>
+      <p id="message-input-help" className="analysis-supporting-copy">
         Paste plain text only. SHADO keeps it in this page&apos;s memory and
         reviews masking before local analysis.
       </p>
@@ -23,30 +48,32 @@ export default function TextInput({ value, onChange, onReview }: TextInputProps)
         Suspicious message
       </label>
       <textarea
+        ref={inputRef}
         id="suspicious-message"
         className="shado-input"
         rows={10}
-        maxLength={MAX_INPUT_LENGTH}
         placeholder="Paste the suspicious message here..."
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        aria-invalid={error ? 'true' : undefined}
+        aria-describedby={describedBy}
       />
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 'var(--space-md)',
-          marginTop: 'var(--space-md)',
-        }}
-      >
-        <span aria-live="polite" style={{ color: 'var(--smoke)' }}>
+      {error ? (
+        <p id="message-input-error" className="analysis-input-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <div className="analysis-input-meta">
+        <span
+          id="message-input-count"
+          aria-live="polite"
+          className={value.length > MAX_INPUT_LENGTH ? 'analysis-count-over' : undefined}
+        >
           {value.length} / {MAX_INPUT_LENGTH}
         </span>
         <button
           type="button"
           className="shado-btn shado-btn-primary"
-          disabled={value.trim().length === 0}
           onClick={onReview}
         >
           Review Message
