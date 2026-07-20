@@ -20,6 +20,22 @@ function entry(definition: SignalLexiconEntry): Readonly<SignalLexiconEntry> {
   });
 }
 
+const FINANCIAL_VALUE_SOURCE = String.raw`(?:(?:(?:kes|ksh)\s*)?\d[\d,]*(?:\.\d{1,2})?|(?:loan\s+)?funds?|cash|money|credit)`;
+const MEDIUM_FINANCIAL_LURE_SOURCES = Object.freeze([
+  String.raw`\byou have received\s+${FINANCIAL_VALUE_SOURCE}\b(?:[\s,:;-]){1,12}\b(?:in|into)\b.{0,24}\b(?:your\s+)?(?:loan|credit)\s+(?:account|a\/c)\b`,
+  String.raw`\byou have been approved for\s+(?:(?:a|an)\s+)?(?:(?:(?:kes|ksh)\s*)?\d[\d,]*(?:\.\d{1,2})?\s+)?(?:loan|credit|cash advance)\b`,
+  String.raw`\b(?:your\s+)?loan funds?\s+(?:are\s+)?(?:ready|available)\s+(?:(?:to|for)\s+)?(?:withdraw(?:al)?|collect(?:ion)?|claim)\b`,
+]);
+const BARE_DOMAIN_ACTION_SOURCE = String.raw`.{0,180}\b(?:visit|open|click|go to)\s+(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}(?::\d+)?(?:[/?#][^\s]*)?(?=$|[\s,;!?]|\.(?=\s|$))`;
+const MEDIUM_FINANCIAL_LURE_PATTERNS = Object.freeze(
+  MEDIUM_FINANCIAL_LURE_SOURCES.map((source) => new RegExp(source, 'iu')),
+);
+const CONTEXTUAL_BARE_DOMAIN_PATTERNS = Object.freeze(
+  MEDIUM_FINANCIAL_LURE_SOURCES.map(
+    (source) => new RegExp(`${source}${BARE_DOMAIN_ACTION_SOURCE}`, 'iu'),
+  ),
+);
+
 export const SIGNAL_LEXICON = Object.freeze([
   entry({
     code: 'CREDENTIAL_REQUEST',
@@ -105,7 +121,14 @@ export const SIGNAL_LEXICON = Object.freeze([
   entry({
     code: 'IMPERSONATION_SAFARICOM',
     patterns: [],
-    keywords: ['safaricom', 'm-pesa support', 'mpesa support', 'customer care'],
+    keywords: [
+      'safaricom',
+      'm-pesa',
+      'mpesa',
+      'm-pesa support',
+      'mpesa support',
+      'customer care',
+    ],
     language: 'english',
     severity: 'info',
   }),
@@ -134,6 +157,13 @@ export const SIGNAL_LEXICON = Object.freeze([
     keywords: [],
     language: 'english',
     severity: 'high',
+  }),
+  entry({
+    code: 'SUSPICIOUS_LINK',
+    patterns: CONTEXTUAL_BARE_DOMAIN_PATTERNS,
+    keywords: [],
+    language: 'english',
+    severity: 'medium',
   }),
   entry({
     code: 'CONTACT_DIVERSION',
@@ -188,6 +218,13 @@ export const SIGNAL_LEXICON = Object.freeze([
     patterns: [],
     keywords: ['usiseme', 'weka siri'],
     language: 'swahili',
+    severity: 'medium',
+  }),
+  entry({
+    code: 'REWARD_BAIT',
+    patterns: MEDIUM_FINANCIAL_LURE_PATTERNS,
+    keywords: [],
+    language: 'english',
     severity: 'medium',
   }),
   entry({

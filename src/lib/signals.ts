@@ -38,8 +38,8 @@ const SIGNAL_COPY = {
     explanation: 'The message invokes KRA or a KRA service; the name alone carries no risk weight.',
   },
   SUSPICIOUS_LINK: {
-    title: 'Suspicious link pattern',
-    explanation: 'The message contains a shortened, numeric-host, or look-alike web address.',
+    title: 'Link or web-address instruction',
+    explanation: 'The message directs you to a shortened, numeric, look-alike, or contextually supplied web address. Verify it independently.',
   },
   CONTACT_DIVERSION: {
     title: 'Contact diverted',
@@ -54,8 +54,8 @@ const SIGNAL_COPY = {
     explanation: 'The sender discourages independent contact or asks that the message be kept secret.',
   },
   REWARD_BAIT: {
-    title: 'Reward or refund bait',
-    explanation: 'The message promises a prize, bonus, refund, jackpot, or relief payment.',
+    title: 'Unexpected money or reward claim',
+    explanation: 'The message claims unexpected loan funds, cash, a prize, refund, bonus, or relief payment.',
   },
 } satisfies Record<SignalCode, Pick<EvidenceItem, 'title' | 'explanation'>>;
 

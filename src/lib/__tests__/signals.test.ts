@@ -77,6 +77,24 @@ describe('extractSignals', () => {
     );
   });
 
+  it.each(['M-PESA', 'MPESA', 'm-pesa', 'mpesa'])(
+    'recognizes %s as zero-weight service context',
+    (variant) => {
+      const signals = extractSignals(
+        variant.toLocaleLowerCase('en-US'),
+        variant,
+      );
+
+      expect(signals).toEqual([
+        expect.objectContaining({
+          code: 'IMPERSONATION_SAFARICOM',
+          severity: 'info',
+          languages: ['english'],
+        }),
+      ]);
+    },
+  );
+
   it('detects approved suspicious-link patterns', () => {
     const shortened = extractSignals(
       'click https://bit.ly/xyz123',
@@ -135,6 +153,69 @@ describe('extractSignals', () => {
       'CONTACT_DIVERSION',
     );
     expect(codesFor('You won a jackpot bonus')).toContain('REWARD_BAIT');
+  });
+
+  it.each([
+    'You have received KES 5,000 in your loan account',
+    'You have been approved for a KES 20,000 loan',
+    'Loan funds are ready to withdraw',
+  ])('detects a tightly scoped medium financial lure: %s', (message) => {
+    const reward = extractSignals(
+      message.toLocaleLowerCase('en-US'),
+      message,
+    ).find(({ code }) => code === 'REWARD_BAIT');
+
+    expect(reward).toMatchObject({ severity: 'medium' });
+  });
+
+  it('detects a bare domain only when it is an action inside a financial lure', () => {
+    const message =
+      'You have been approved for a KES 20,000 loan. Visit offers.example.co.ke/claim to continue.';
+    const signals = extractSignals(
+      message.toLocaleLowerCase('en-US'),
+      message,
+    );
+
+    expect(signals).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'REWARD_BAIT', severity: 'medium' }),
+        expect.objectContaining({ code: 'SUSPICIOUS_LINK', severity: 'medium' }),
+      ]),
+    );
+  });
+
+  it('does not treat ordinary confirmations, payments, references, or bare domains as a medium lure', () => {
+    const benignMessages = [
+      'M-PESA CONFIRMED. You received KES 500 from Jane.',
+      'Your loan payment was received. Thank you.',
+      'Visit safaricom.co.ke for official M-PESA information.',
+      'Visit example.co.ke for our opening hours.',
+      'KES 5,000',
+      'CONFIRMED',
+      'Your account reference is [REFERENCE].',
+      'You have received a statement in your loan account. Visit bank.example.com for details.',
+      'You have received 1 statement in your loan account. Visit bank.example.com for details.',
+      'You have received 2 messages in your loan account. Visit portal.example.com.',
+      'You have been approved for membership. We also publish information about a loan. Visit example.org.',
+    ];
+
+    for (const message of benignMessages) {
+      const signals = extractSignals(
+        message.toLocaleLowerCase('en-US'),
+        message,
+      );
+      expect(
+        signals.find(({ code }) => code === 'REWARD_BAIT')?.severity,
+      ).not.toBe('medium');
+      expect(signals.map(({ code }) => code)).not.toContain('SUSPICIOUS_LINK');
+    }
+  });
+
+  it.each([
+    'You have been approved for a KES 20,000 loan. Visit example.com.123 to continue.',
+    'You have been approved for a KES 20,000 loan. Visit example.com._bad to continue.',
+  ])('rejects an invalid dotted bare-domain token: %s', (message) => {
+    expect(codesFor(message)).not.toContain('SUSPICIOUS_LINK');
   });
 
   it('does not treat ordinary payments, contact, or confidentiality wording as threat evidence', () => {

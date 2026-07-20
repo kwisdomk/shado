@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { MAX_INPUT_LENGTH, POLICY_VERSION, SCHEMA_VERSION } from '../constants';
 import { analyzeMessage, resolveSignalLanguages } from '../engine';
+import { maskPII } from '../pii-masker';
 import { AnalysisReportSchema } from '../schema';
+
+const REPORTED_FINANCIAL_LURE =
+  'MPESA CONFIRMED You have Received KES 5,000.00 in your loan A/C 254752130269. Dial *321*40# select 2 Withdraw to MPESA to get cash now or visit easycash.co.ke';
 
 describe('analyzeMessage', () => {
   it('analyzes a classic M-PESA reversal locally', () => {
@@ -54,6 +58,132 @@ describe('analyzeMessage', () => {
       expect(report.recommendedActionCodes).toEqual([]);
       expect(report.headline.toLowerCase()).toContain('no strong indicators');
     }
+  });
+
+  it('corrects the reported contextual financial-lure false negative after masking', () => {
+    const masking = maskPII(REPORTED_FINANCIAL_LURE);
+    const report = analyzeMessage(REPORTED_FINANCIAL_LURE);
+
+    expect(masking.maskedText).toContain('[REFERENCE]');
+    expect(masking.maskedText).not.toContain('254752130269');
+    expect(AnalysisReportSchema.parse(report)).toEqual(report);
+    expect(Object.keys(report).sort()).toEqual(
+      [
+        'schemaVersion',
+        'policyVersion',
+        'method',
+        'riskLevel',
+        'indicatorScore',
+        'scoreIsProbability',
+        'likelyFamily',
+        'languages',
+        'headline',
+        'summary',
+        'evidence',
+        'recommendedActionCodes',
+        'uncertainty',
+        'limitations',
+        'patternContext',
+      ].sort(),
+    );
+    expect(report.limitations.length).toBeGreaterThan(0);
+    expect(report).toMatchObject({
+      schemaVersion: '1.0.0',
+      policyVersion: '0.2-demo',
+      method: 'local',
+      riskLevel: 'caution',
+      indicatorScore: 35,
+      scoreIsProbability: false,
+      likelyFamily: 'unknown',
+      languages: ['english'],
+      headline: 'Some caution indicators were found',
+      summary:
+        'The local rules found 3 indicators consistent with an unclear pattern. Verify unexpected requests independently.',
+      uncertainty: null,
+      patternContext: null,
+    });
+    expect(report.riskLevel).toBe('caution');
+    expect(report.indicatorScore).toBe(35);
+    expect(report.likelyFamily).toBe('unknown');
+    expect(report.evidence.map(({ code }) => code)).toEqual([
+      'IMPERSONATION_SAFARICOM',
+      'SUSPICIOUS_LINK',
+      'REWARD_BAIT',
+    ]);
+    expect(report.recommendedActionCodes).toEqual([
+      'DO_NOT_CLICK',
+      'DO_NOT_REPLY',
+      'DO_NOT_SEND_MONEY',
+      'PRESERVE_MESSAGE',
+    ]);
+    expect(JSON.stringify(report)).not.toContain('254752130269');
+  });
+
+  it.each(['M-PESA', 'MPESA', 'm-pesa', 'mpesa'])(
+    'keeps %s service context alone at zero risk',
+    (variant) => {
+      const report = analyzeMessage(variant);
+
+      expect(report.riskLevel).toBe('low');
+      expect(report.indicatorScore).toBe(0);
+      expect(report.likelyFamily).toBe('none');
+      expect(report.recommendedActionCodes).toEqual([]);
+      expect(report.evidence.map(({ code }) => code)).toEqual([
+        'IMPERSONATION_SAFARICOM',
+      ]);
+    },
+  );
+
+  it('keeps the complete CORE-04B false-positive controls at zero risk', () => {
+    const benignMessages = [
+      'M-PESA is useful for sending money.',
+      'M-PESA CONFIRMED. You received KES 500 from Jane.',
+      'Your loan payment was received. Thank you.',
+      'Visit safaricom.co.ke for official M-PESA information.',
+      'Visit example.co.ke for our opening hours.',
+      'Dial *334# to access M-PESA services.',
+      'Dial *572# to verify KRA staff.',
+      'KES 5,000',
+      'CONFIRMED',
+      'Your account reference is [REFERENCE].',
+      'You have received a statement in your loan account. Visit bank.example.com for details.',
+      'You have received 1 statement in your loan account. Visit bank.example.com for details.',
+      'You have received 2 messages in your loan account. Visit portal.example.com.',
+      'You have been approved for membership. We also publish information about a loan. Visit example.org.',
+    ];
+
+    for (const message of benignMessages) {
+      const report = analyzeMessage(message);
+      expect(report.riskLevel, message).toBe('low');
+      expect(report.indicatorScore, message).toBe(0);
+      expect(report.likelyFamily, message).toBe('none');
+      expect(report.recommendedActionCodes, message).toEqual([]);
+      expect(
+        report.evidence.map(({ code }) => code),
+        message,
+      ).not.toContain('REWARD_BAIT');
+      expect(
+        report.evidence.map(({ code }) => code),
+        message,
+      ).not.toContain('SUSPICIOUS_LINK');
+    }
+  });
+
+  it('preserves the existing 75/100 credential-theft regression', () => {
+    const report = analyzeMessage(
+      'URGENT! Your M-PESA account will be blocked. Call 0712 345 678 and send your PIN now.',
+    );
+
+    expect(report.riskLevel).toBe('very_high');
+    expect(report.indicatorScore).toBe(75);
+    expect(report.likelyFamily).toBe('credential_theft');
+    expect(report.evidence.map(({ code }) => code)).toEqual(
+      expect.arrayContaining([
+        'CREDENTIAL_REQUEST',
+        'URGENCY_THREAT',
+        'CONTACT_DIVERSION',
+      ]),
+    );
   });
 
   it('keeps a link alone and urgency alone below high', () => {

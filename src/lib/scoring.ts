@@ -16,6 +16,9 @@ export const SIGNAL_WEIGHTS = Object.freeze({
 } satisfies Record<SignalCode, number>);
 
 const UNOFFICIAL_DOMAIN_IMPERSONATION_WEIGHT = 35;
+const CONTEXTUAL_SIGNAL_BONUSES = Object.freeze({
+  MEDIUM_FINANCIAL_LURE: 10,
+} as const);
 
 export function calculateScore(signals: readonly ExtractedSignal[]): number {
   const codes = new Set(signals.map(({ code }) => code));
@@ -23,6 +26,11 @@ export function calculateScore(signals: readonly ExtractedSignal[]): number {
   const urgency = signals.find(({ code }) => code === 'URGENCY_THREAT');
   if (urgency?.severity === 'high') {
     score += 5;
+  }
+
+  const financialLure = signals.find(({ code }) => code === 'REWARD_BAIT');
+  if (financialLure?.severity === 'medium') {
+    score += CONTEXTUAL_SIGNAL_BONUSES.MEDIUM_FINANCIAL_LURE;
   }
 
   const impersonatesOfficial =
