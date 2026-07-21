@@ -4,6 +4,11 @@ SHADO is a privacy-first, mobile-focused tool that checks suspicious Kenyan mess
 
 **Current checkpoint:** deterministic local MVP. GPT-5.6 and other OpenAI models are not used at runtime.
 
+## Live demo
+
+The deployed deterministic local MVP is available at:
+https://shado-ivory.vercel.app
+
 ## The problem
 
 Mobile fraud messages can imitate M-PESA, Safaricom, KRA, and other familiar services while using urgency, credential requests, fake reversal instructions, suspicious links, or payment pressure. Kenyan users may need a quick, understandable second look before they reply, click, send money, or disclose a PIN or OTP.
@@ -128,7 +133,7 @@ This describes development-time collaboration. It does **not** mean that GPT-5.6
 - Masking is deterministic and incomplete: names and unfamiliar formats require manual review.
 - There is no runtime GPT-5.6 or other model analysis, multi-agent runtime pipeline, or server analysis API.
 - There is no background SMS or inbox access, OCR, automatic fraud reporting, sender blocking, or transaction action.
-- There is no completed PWA, offline guarantee, Android Share Target, native Android app, or verified production deployment.
+- There is no completed PWA, offline guarantee, Android Share Target, or native Android app.
 - SHADO has no persistent message history, community reporting, phone-number reputation service, or threat database.
 - The current tests are prototype regression evidence, not an accuracy evaluation or population-level validation.
 
